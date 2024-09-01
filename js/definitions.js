@@ -157,6 +157,8 @@ export class GameMap {
      * @returns { Promise<GameMap> } 
      */
     static async dynamic(name) {
+        console.log(name);
+        console.log((await import(name)).default);
         const result = new (await import(name)).default();
         await result.load();
         return result;
