@@ -236,7 +236,7 @@ export class Game {
         return this.map.surfaces.filter(surface => {
             if (surface.virtual) return false;
             if (surface.type in [SurfaceType.Ceiling, SurfaceType.Floor]) {
-                return surface.leftX <= this.player.x && surface.rightX >= this.player.x;
+                return surface.leftX < this.player.x && surface.rightX > this.player.x;
             }
             const realY = (this.player.y - this.player.speedY);
             return surface.bottomY < realY && realY < surface.topY;

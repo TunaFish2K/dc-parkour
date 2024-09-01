@@ -262,7 +262,6 @@ function handleKeyDown(e) {
         selectedSurfaceIndex = (selectedSurfaceIndex - 1) % surfaces.length;
     }
     else if (e.key === 'Tab') {
-        e.preventDefault();
         switchToNextPresetDirection();
     } else if (e.key === 'c') {
         copyToClipboard();
