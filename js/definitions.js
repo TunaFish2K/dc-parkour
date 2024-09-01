@@ -280,7 +280,7 @@ export class Game {
 
         for (const floor of floors) {
             const top = floor.startY + Math.tan(floor.facing - Math.PI / 2) * this.player.x;
-            if (this.player.y < top && this.player.y > top - 50) {
+            if (this.player.y < top && this.player.y > top - 11) {
                 this.player.y = top;
                 this.player.onGround = true;
                 this.player.extraJump = 1;
@@ -289,13 +289,13 @@ export class Game {
 
         for (const ceiling of ceilings) {
             const bottom = ceiling.startY + Math.tan(ceiling.facing - Math.PI / 2) * this.player.x;
-            if (this.player.y > bottom && this.player.y < bottom + 50) {
+            if (this.player.y > bottom && this.player.y < bottom + 11) {
                 this.player.y = bottom;
             }
         }
 
         for (const wall of walls) {
-            if ((wall.facing === 0 && this.player.x > wall.startX - 25 && this.player.x < wall.startX) || (wall.facing !== 0 && this.player.x < wall.startX + 25 && this.player.x > wall.startX)) {
+            if ((wall.facing === 0 && this.player.x > wall.startX - 21 && this.player.x < wall.startX) || (wall.facing !== 0 && this.player.x < wall.startX + 21 && this.player.x > wall.startX)) {
                 this.player.x = wall.startX;
             }
         }
@@ -314,7 +314,7 @@ export class Game {
             this.player.x += 10;
         }
         // player gravity
-        if (this.player.speedY > -10) this.player.speedY = Math.max(-10, this.player.speedY - 2);
+        if (this.player.speedY > -10) this.player.speedY = Math.max(-10, this.player.speedY - 1.5);
         this.player.y += this.player.speedY;
         // reset onGround
         this.player.onGround = false;
