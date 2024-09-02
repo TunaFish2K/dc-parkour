@@ -10,6 +10,16 @@ export const SurfaceType = {
     Win: 3
 }
 
+/**
+ * 
+ * @param { number } a 
+ * @param { number } b
+ * @returns { number } 
+ */
+function mod(a, b) {
+    return ((a % b) + b) % b;
+}
+
 export class Surface {
     /**
      * @type { number }
@@ -38,7 +48,6 @@ export class Surface {
     calculateBox() {
         this.endX = this.startX + Math.cos(this.facing - Math.PI / 2) * this.length;
         this.endY = this.startY + Math.sin(this.facing - Math.PI / 2) * this.length;
-        console.log(this.startX, this.startY, this.endX, this.endY);
         if (this.endX > this.startX) {
             this.leftX = this.startX;
             this.rightX = this.endX;
@@ -55,9 +64,10 @@ export class Surface {
         }
     }
     calculateType() {
-        const facing = this.facing % (Math.PI * 2);
+        const facing = mod(this.facing, (Math.PI * 2));
         if (facing > 0 && facing < Math.PI) return SurfaceType.Floor;
         if (facing > Math.PI && facing < 2 * Math.PI) return SurfaceType.Ceiling;
+        console.log(this, facing);
         return SurfaceType.Wall;
     }
 
@@ -114,53 +124,36 @@ export class Surface {
 
 export class GameMap {
     /**
-     * @abstract
-     * @type { number }
-     */
-    spawnX;
-    /**
-     * @abstract
-     * @type { number }
-     */
-    spawnY;
-    /**
-     * @type { Surface }
-     */
-    winSurface;
-    /**
-     * @abstract
      * @type { Surface[] }
      */
     surfaces;
     /**
-     * @abstract
-     * @return { Promise<void> | void }
+     * @type { number }
      */
-    load() {
-        throw new Error("not implemented!");
-    }
+    spawnX;
     /**
-     * @abstract
-     * @type { boolean }
+     * @type { number }
      */
-    hasNext;
+    spawnY;
     /**
-     * @abstract
-     * @return { Promise<GameMap?> | GameMap? }
+     * @type { number }
      */
-    next() {
-        return null;
-    }
+    endpointX;
+    /**
+     * @type { number }
+     */
+    endpointY;
 
     /**
-     * @param { string } name
-     * @returns { Promise<GameMap> } 
+     * @param { string } url 
+     * @returns { Promise<GameMap> }
      */
-    static async dynamic(name) {
-        console.log(name);
-        console.log((await import(name)).default);
-        const result = new (await import(name)).default();
-        await result.load();
+    static async load(url) {
+        const obj = await (await fetch(url)).json();
+        const result = new GameMap();
+        result.surfaces = obj.surfaces.map(Surface.fromArray);
+        [result.spawnX, result.spawnY] = obj.spawn;
+        [result.endpointX, result.endpointY] = obj.endpoint;
         return result;
     }
 }
@@ -174,6 +167,10 @@ export class Player {
      * @type { number }
      */
     y = 0;
+    /**
+     * @type { number }
+     */
+    speedX = 0;
     /**
      * @type { number }
      */
@@ -232,107 +229,104 @@ export class Game {
     }
 
     /**
-     * @returns { Surface[] }
+     * @returns { {floors: Surface[]; ceilings: Surface[]; walls: Surface[];} }
      */
     getRelevantSurfaces() {
-        return this.map.surfaces.filter(surface => {
-            if (surface.virtual) return false;
+        /**
+         * @type { {floors: Surface[]; ceilings: Surface[]; walls: Surface[];} }
+         */
+        const result = {
+            floors: [],
+            ceilings: [],
+            walls: []
+        };
+        for (const surface of this.map.surfaces.filter(surface => !surface.virtual)/*.filter(surface => {
             if (surface.type in [SurfaceType.Ceiling, SurfaceType.Floor]) {
                 return surface.leftX < this.player.x && surface.rightX > this.player.x;
             }
             const realY = (this.player.y - this.player.speedY);
             return surface.bottomY < realY && realY < surface.topY;
-        });
-    }
-
-    /**
-     * @returns { boolean }
-     */
-    surfaceInteractions() {
-        const surfaces = this.getRelevantSurfaces();
-        /**
-         * @type { Surface[] }
-         */
-        const walls = [];
-        /**
-         * @type { Surface[] }
-         */
-        const ceilings = [];
-        /**
-         * @type { Surface[] }
-         */
-        const floors = [];
-        while (true) {
-            const current = surfaces.pop();
-            if (!current) break;
-            switch (current.type) {
-                case SurfaceType.Ceiling:
-                    ceilings.push(current);
-                    break;
-                case SurfaceType.Floor:
-                    floors.push(current);
-                    break;
-                default:
-                    walls.push(current);
+        })*/) {
+            if (surface.type === SurfaceType.Floor) {
+                result.floors.push(surface);
+            } else if (surface.type === SurfaceType.Ceiling) {
+                result.ceilings.push(surface);
+            } else {
+                result.walls.push(surface);
             }
         }
-        if (this.map.winSurface.bottomY - 10 <= this.player.y && this.map.winSurface.topY + 10 >= this.player.y && this.player.x >= this.map.winSurface.leftX - 15 && this.player.x <= this.map.winSurface.rightX + 15 && this.map.hasNext) {
-            return true;
-        }
+        return result;
+    }
 
-        for (const floor of floors) {
-            const top = floor.startY + Math.tan(floor.facing - Math.PI / 2) * this.player.x;
-            if (this.player.y < top && this.player.y > top - 11) {
-                this.player.y = top;
+    movement() {
+        const { floors, ceilings, walls } = this.getRelevantSurfaces();
+        let nextX = this.player.x + this.player.speedX;
+        let nextY = this.player.y + this.player.speedY;
+        for (const surface of walls) {
+            if (this.player.x > surface.rightX && nextX > surface.rightX) continue;
+            if (this.player.x < surface.leftX && nextX < surface.leftX) continue;
+            if (this.player.y > surface.topY && nextY > surface.topY) continue;
+            if (this.player.y < surface.bottomY && nextY < surface.bottomY) continue;
+
+            if (mod(surface.facing, (Math.PI * 2)) === 0 && nextX < surface.leftX) { // 不许往右
+                nextX = surface.leftX + 1;
+            }
+            if (mod(surface.facing, (Math.PI * 2)) !== 0 && nextX > surface.leftX) { // 不许往左
+                nextX = surface.leftX - 1;
+            }
+        }
+        for (const surface of floors) {
+            if (this.player.x > surface.rightX && nextX > surface.rightX) continue;
+            if (this.player.x < surface.leftX && nextX < surface.leftX) continue;
+            if (this.player.y > surface.topY && nextY > surface.topY) continue;
+            if (this.player.y < surface.bottomY && nextY < surface.bottomY) continue;
+
+            const top = surface.startY + Math.tan(surface.facing - Math.PI / 2) * (nextX - surface.startX);
+            this.context.fillStyle = "#00FFFF77";
+            this.context.fillRect(nextX - 5, 600 - top - 5, 10, 10);
+            if (nextY < top) {
+                nextY = top;
                 this.player.onGround = true;
                 this.player.extraJump = 1;
+                console.log("awa");
             }
         }
+        for (const surface of ceilings) {
+            if (this.player.x > surface.rightX && nextX > surface.rightX) continue;
+            if (this.player.x < surface.leftX && nextX < surface.leftX) continue;
+            if (this.player.y > surface.topY && nextY > surface.topY) continue;
+            if (this.player.y < surface.bottomY && nextY < surface.bottomY) continue;
 
-        for (const ceiling of ceilings) {
-            const bottom = ceiling.startY + Math.tan(ceiling.facing - Math.PI / 2) * this.player.x;
-            if (this.player.y > bottom && this.player.y < bottom + 11) {
-                this.player.y = bottom;
+            const bottom = surface.startY + Math.tan(surface.facing - Math.PI / 2) * (nextX - surface.startX);
+            if (nextY > bottom) {
+                nextY = bottom;
+                console.log("qaq");
             }
         }
-
-        for (const wall of walls) {
-            if ((wall.facing === 0 && this.player.x > wall.startX - 21 && this.player.x < wall.startX) || (wall.facing !== 0 && this.player.x < wall.startX + 21 && this.player.x > wall.startX)) {
-                this.player.x = wall.startX;
-            }
-        }
-        return false;
+        this.player.x = nextX;
+        this.player.y = nextY;
     }
 
-    async logic() {
-        // revive
-        if (this.player.y < -100) this.spawn();
-
-        // player horizontal movement
-        if (this.keyEvents.walkingLeft) {
-            this.player.x -= 10;
-        }
-        if (this.keyEvents.walkingRight) {
-            this.player.x += 10;
-        }
-        // player gravity
-        if (this.player.speedY > -10) this.player.speedY = Math.max(-10, this.player.speedY - 1.5);
-        this.player.y += this.player.speedY;
-        // reset onGround
+    logic() {
+        if (this.player.y < -50) this.spawn();
         this.player.onGround = false;
-        // interact with surfaces
-        const won = this.surfaceInteractions();
-        // player jump
-        if ((this.keyEvents.jumping && (this.player.onGround || this.player.extraJump > 0))) {
-            this.player.speedY = 20;
-            this.keyEvents.jumping = false;
-            if (!this.player.onGround) this.player.extraJump -= 1;
+        if (this.keyEvents.walkingLeft && !this.keyEvents.walkingRight) {
+            this.player.speedX = -10;
         }
-        if (won) {
-            const next = await this.map.next();
-            if (!next) throw new Error("no next level!");
-            this.map = next;
-            this.spawn();
+        else if (this.keyEvents.walkingRight && !this.keyEvents.walkingLeft) {
+            this.player.speedX = 10;
+        }
+        else {
+            this.player.speedX = 0;
+        }
+        this.movement();
+        this.player.speedY = Math.max(-10, this.player.speedY - 1.5);
+        if (this.keyEvents.jumping) {
+            this.keyEvents.jumping = false;
+            if (this.player.onGround || this.player.extraJump > 0) {
+                if (!this.player.onGround) this.player.extraJump--;
+                this.player.speedY = 20;
+            }
         }
     }
 
@@ -345,12 +339,6 @@ export class Game {
         this.context.fillStyle = "black";
         this.context.fillRect(this.player.x - 5, this.canvas.height - this.player.y, 10, -40);
         // render surfaces
-        this.context.strokeStyle = "red";
-        this.context.beginPath();
-        this.context.moveTo(this.map.winSurface.startX, this.canvas.height - this.map.winSurface.startY);
-        this.context.lineTo(this.map.winSurface.endX, this.canvas.height - this.map.winSurface.endY);
-        this.context.stroke();
-
         this.context.strokeStyle = "black";
         for (const surface of this.map.surfaces) {
             this.context.beginPath();
@@ -398,6 +386,7 @@ export class Game {
         this.player.x = this.map.spawnX;
         this.player.y = this.map.spawnY;
         this.player.speedY = 0;
+        console.log("spawn");
     }
 }
 

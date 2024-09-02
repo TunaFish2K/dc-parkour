@@ -9,7 +9,8 @@
 
 const HEIGHT = 600;
 
-let canvas, ctx, surfaces, selectedSurfaceIndex, keysPressed, history;
+let canvas, ctx, surfaces, selectedSurfaceIndex, keysPressed, history, spawn, endpoint;
+let selectedObject = 'surface'; // 用于跟踪当前选择的是 surfaces, spawn 还是 endpoint
 
 const PRESET_DIRECTIONS = [
     0,
@@ -31,6 +32,8 @@ function initializeEditor() {
     selectedSurfaceIndex = -1;
     keysPressed = {};
     history = [];
+    spawn = [300, 300];
+    endpoint = [500, 300];
 
     canvas.style.display = 'block'; // 显示画布
 
@@ -41,6 +44,22 @@ function initializeEditor() {
     // 每秒刷新 50 次
     setInterval(update, 1000 / 50);
     draw();
+}
+
+function drawPoints() {
+    // 绘制出生点
+    ctx.fillStyle = selectedObject === 'spawn' ? 'yellow' : 'green'; // 高亮出生点
+    ctx.beginPath();
+    ctx.arc(spawn[0], HEIGHT - spawn[1], 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText('Spawn', spawn[0] + 10, HEIGHT - spawn[1] - 10);
+
+    // 绘制终点
+    ctx.fillStyle = selectedObject === 'endpoint' ? 'yellow' : 'red'; // 高亮终点
+    ctx.beginPath();
+    ctx.arc(endpoint[0], HEIGHT - endpoint[1], 10, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.fillText('End', endpoint[0] + 10, HEIGHT - endpoint[1] - 10);
 }
 
 /**
@@ -76,11 +95,13 @@ function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
     surfaces.forEach((surface, index) => {
-        ctx.strokeStyle = index === selectedSurfaceIndex ? (surface[4] ? 'pink' : 'red') : (surface[4]? 'gray' : 'black');
+        ctx.strokeStyle = index === selectedSurfaceIndex ? (surface[4] ? 'pink' : 'red') : (surface[4] ? 'gray' : 'black');
         drawSurface(surface);
     });
 
-    if (selectedSurfaceIndex !== -1) {
+    drawPoints(); // 绘制出生点和终点
+
+    if (selectedSurfaceIndex !== -1 && selectedObject === 'surface') {
         const surface = surfaces[selectedSurfaceIndex];
         const [startX, startY, length, facing] = surface;
         ctx.fillStyle = 'black';
@@ -88,27 +109,41 @@ function draw() {
             `Selected Surface: Start (${startX.toFixed(2)}, ${startY.toFixed(2)}), Length: ${length.toFixed(2)}, Facing: ${facing.toFixed(2)} rad`,
             10, 20
         );
+    } else if (selectedObject === 'spawn') {
+        ctx.fillText(`Selected: Spawn Point (${spawn[0].toFixed(2)}, ${spawn[1].toFixed(2)})`, 10, 20);
+    } else if (selectedObject === 'endpoint') {
+        ctx.fillText(`Selected: End Point (${endpoint[0].toFixed(2)}, ${endpoint[1].toFixed(2)})`, 10, 20);
     }
 }
 
 /**
- * 更新当前选中边的位置、长度和方向。
+ * 更新当前选中对象的位置。
  */
 function update() {
-    if (selectedSurfaceIndex === -1) return;
+    if (selectedObject === 'surface' && selectedSurfaceIndex !== -1) {
+        const surface = surfaces[selectedSurfaceIndex];
 
-    const surface = surfaces[selectedSurfaceIndex];
+        if (keysPressed['a']) surface[0] -= 2; // 向左移动
+        if (keysPressed['d']) surface[0] += 2; // 向右移动
+        if (keysPressed['w']) surface[1] += 2; // 向上移动
+        if (keysPressed['s']) surface[1] -= 2; // 向下移动
 
-    if (keysPressed['a']) surface[0] -= 2; // 向左移动
-    if (keysPressed['d']) surface[0] += 2; // 向右移动
-    if (keysPressed['w']) surface[1] += 2; // 向上移动
-    if (keysPressed['s']) surface[1] -= 2; // 向下移动
+        if (keysPressed['ArrowDown']) surface[2] = Math.max(0, surface[2] - 2); // 减小长度
+        if (keysPressed['ArrowUp']) surface[2] += 2; // 增加长度
 
-    if (keysPressed['ArrowDown']) surface[2] = Math.max(0, surface[2] - 2); // 减小长度
-    if (keysPressed['ArrowUp']) surface[2] += 2; // 增加长度
-
-    if (keysPressed['ArrowRight']) surface[3] += Math.PI / 90; // 顺时针旋转
-    if (keysPressed['ArrowLeft']) surface[3] -= Math.PI / 90; // 逆时针旋转
+        if (keysPressed['ArrowRight']) surface[3] += Math.PI / 90; // 顺时针旋转
+        if (keysPressed['ArrowLeft']) surface[3] -= Math.PI / 90; // 逆时针旋转
+    } else if (selectedObject === 'spawn') {
+        if (keysPressed['a']) spawn[0] -= 2;
+        if (keysPressed['d']) spawn[0] += 2;
+        if (keysPressed['w']) spawn[1] += 2;
+        if (keysPressed['s']) spawn[1] -= 2;
+    } else if (selectedObject === 'endpoint') {
+        if (keysPressed['a']) endpoint[0] -= 2;
+        if (keysPressed['d']) endpoint[0] += 2;
+        if (keysPressed['w']) endpoint[1] += 2;
+        if (keysPressed['s']) endpoint[1] -= 2;
+    }
 
     draw();
 }
@@ -119,8 +154,10 @@ function update() {
 function switchToNextPresetDirection() {
     if (selectedSurfaceIndex === -1) return;
 
+    const CIRCLE = Math.PI * 2;
     const surface = surfaces[selectedSurfaceIndex];
-    const currentFacing = surface[3];
+    const currentFacing = ((surface[3] % CIRCLE) + CIRCLE) % CIRCLE;
+    console.log(currentFacing);
 
     for (let i = PRESET_DIRECTIONS.length - 1; i >= 0; i--) {
         if (currentFacing === PRESET_DIRECTIONS[i]) {
@@ -202,20 +239,30 @@ function switchVirtualSurface() {
 }
 
 /**
- * 将所有边的数据以 JSON 格式复制到剪贴板。
+ * 导出所有边的数据、出生点和终点的数据，以 JSON 格式输出到控制台。
  */
-function copyToClipboard() {
-    const jsonString = JSON.stringify(surfaces);
-    navigator.clipboard.writeText(jsonString).then(() => {
-        alert('地图数据已经拷贝到剪贴板！');
-    });
+function outputSurfaces() {
+    const exportData = {
+        surfaces: surfaces,
+        spawn: spawn,
+        endpoint: endpoint
+    };
+    console.log(JSON.stringify(exportData));
 }
 
 /**
- * 将所有边的数据以 JSON 格式输出到控制台。
+ * 将所有边的数据、出生点和终点的数据以 JSON 格式复制到剪贴板。
  */
-function outputSurfaces() {
-    console.log(JSON.stringify(surfaces));
+function copyToClipboard() {
+    const exportData = {
+        surfaces: surfaces,
+        spawn: spawn,
+        endpoint: endpoint
+    };
+    const jsonString = JSON.stringify(exportData);
+    navigator.clipboard.writeText(jsonString).then(() => {
+        alert('地图数据已经拷贝到剪贴板！');
+    });
 }
 
 /**
@@ -248,6 +295,7 @@ function undo() {
     }
 }
 
+
 /**
  * 处理键盘按下事件。
  * @param {KeyboardEvent} e - 键盘事件对象
@@ -255,14 +303,24 @@ function undo() {
 function handleKeyDown(e) {
     e.preventDefault();
     keysPressed[e.key] = true;
-
-    if (e.key === ' ') {
-        selectedSurfaceIndex = (selectedSurfaceIndex + 1) % surfaces.length;
-    } else if (e.key === 'e') {
-        selectedSurfaceIndex = (selectedSurfaceIndex - 1) % surfaces.length;
-    }
-    else if (e.key === 'Tab') {
+    
+    if (e.key === 'Tab') {
         switchToNextPresetDirection();
+    } else if (e.key === `t`) {
+        if (selectedObject === 'surface') {
+            selectedObject = 'spawn';
+            selectedSurfaceIndex = -1; // 清除选中的 surface
+        } else if (selectedObject === 'spawn') {
+            selectedObject = 'endpoint';
+        } else {
+            selectedObject = 'surface';
+            selectedSurfaceIndex = 0; // 选中第一个 surface
+        }
+    } 
+    else if (selectedObject === 'surface' && e.key === ' ') {
+        selectedSurfaceIndex = (selectedSurfaceIndex + 1) % surfaces.length;
+    } else if (selectedObject === 'surface' && e.key === 'e') {
+        selectedSurfaceIndex = (selectedSurfaceIndex - 1 + surfaces.length) % surfaces.length;
     } else if (e.key === 'c') {
         copyToClipboard();
     } else if (e.key === 'p') {
@@ -275,8 +333,7 @@ function handleKeyDown(e) {
         undo();
     } else if (e.key === 'f') {
         createOppositeSurface();
-    }
-    else if (e.key === 'v') {
+    } else if (e.key === 'v') {
         copySurface();
     } else if (e.key === 'q') {
         switchVirtualSurface();
