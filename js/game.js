@@ -332,6 +332,10 @@ export class Player {
      * @type { number }
      */
     extraJump = 0;
+    /**
+     * @type { number }
+     */
+    maxExtraJump = 1;
 }
 
 export class Game {
@@ -458,7 +462,7 @@ export class Game {
             if (this.player.y > curTop && nextY <= nextTop) {
                 nextY = nextTop + 1;
                 this.player.onGround = true;
-                this.player.extraJump = 1;
+                this.player.extraJump = this.player.maxExtraJump;
             }
         }
         for (const surface of ceilings) {
@@ -518,8 +522,8 @@ export class Game {
         this.player.speedY = Math.max(-10, this.player.speedY - 1.5);
         if (this.keyEvents.jumping) {
             this.keyEvents.jumping = false;
-            if (this.player.onGround || this.player.extraJump > 0) {
-                if (!this.player.onGround) this.player.extraJump--;
+            if (this.player.onGround || this.player.extraJump > 0 || this.player.extraJump === -1) {
+                if (!this.player.onGround && this.player.extraJump !== -1) this.player.extraJump--;
                 this.player.speedY = 20;
             }
         }
@@ -612,7 +616,7 @@ export class Game {
 
     spawn() {
         this.player.x = this.map.leftX + 20;
-        this.player.y = 300;
+        this.player.y = 301;
     }
 }
 

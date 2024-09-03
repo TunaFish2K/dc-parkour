@@ -7,12 +7,16 @@ function getPoolURL() {
 }
 
 async function main() {
-    const game = new Game(document.getElementById("game"), new Player());
+    const game = window.game =new Game(document.getElementById("game"), new Player());
     game.currentMapSequence = (await Pool.load(getPoolURL())).create();
     game.currentMapIndex = 0;
     game.spawn();
     setInterval(game.render.bind(game), 20);
     setInterval(game.logic.bind(game), 20);
 }
+
+window.cheat = () => {
+    window.game.player.maxExtraJump = -1;
+};
 
 window.addEventListener("load", main);
