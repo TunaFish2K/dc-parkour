@@ -9,8 +9,7 @@
 
 const HEIGHT = 600;
 
-let canvas, ctx, surfaces, selectedSurfaceIndex, keysPressed, history, spawn, endpoint;
-let selectedObject = 'surface'; // 用于跟踪当前选择的是 surfaces, spawn 还是 endpoint
+let canvas, ctx, surfaces = [], selectedSurfaceIndex, keysPressed, history;
 
 const PRESET_DIRECTIONS = [
     0,
@@ -32,8 +31,6 @@ function initializeEditor() {
     selectedSurfaceIndex = -1;
     keysPressed = {};
     history = [];
-    spawn = [300, 300];
-    endpoint = [500, 300];
 
     canvas.style.display = 'block'; // 显示画布
 
@@ -44,22 +41,6 @@ function initializeEditor() {
     // 每秒刷新 50 次
     setInterval(update, 1000 / 50);
     draw();
-}
-
-function drawPoints() {
-    // 绘制出生点
-    ctx.fillStyle = selectedObject === 'spawn' ? 'yellow' : 'green'; // 高亮出生点
-    ctx.beginPath();
-    ctx.arc(spawn[0], HEIGHT - spawn[1], 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillText('Spawn', spawn[0] + 10, HEIGHT - spawn[1] - 10);
-
-    // 绘制终点
-    ctx.fillStyle = selectedObject === 'endpoint' ? 'yellow' : 'red'; // 高亮终点
-    ctx.beginPath();
-    ctx.arc(endpoint[0], HEIGHT - endpoint[1], 10, 0, Math.PI * 2);
-    ctx.fill();
-    ctx.fillText('End', endpoint[0] + 10, HEIGHT - endpoint[1] - 10);
 }
 
 /**
@@ -98,29 +79,23 @@ function draw() {
         ctx.strokeStyle = index === selectedSurfaceIndex ? (surface[4] ? 'pink' : 'red') : (surface[4] ? 'gray' : 'black');
         drawSurface(surface);
     });
+    if (selectedSurfaceIndex < 0) return;
+    const surface = surfaces[selectedSurfaceIndex];
+    if (!surface) return;
+    const [startX, startY, length, facing] = surface;
+    ctx.fillStyle = 'black';
+    ctx.fillText(
+        `Selected Surface: Start (${startX.toFixed(2)}, ${startY.toFixed(2)}), Length: ${length.toFixed(2)}, Facing: ${facing.toFixed(2)} rad`,
+        10, 20
+    );
 
-    drawPoints(); // 绘制出生点和终点
-
-    if (selectedSurfaceIndex !== -1 && selectedObject === 'surface') {
-        const surface = surfaces[selectedSurfaceIndex];
-        const [startX, startY, length, facing] = surface;
-        ctx.fillStyle = 'black';
-        ctx.fillText(
-            `Selected Surface: Start (${startX.toFixed(2)}, ${startY.toFixed(2)}), Length: ${length.toFixed(2)}, Facing: ${facing.toFixed(2)} rad`,
-            10, 20
-        );
-    } else if (selectedObject === 'spawn') {
-        ctx.fillText(`Selected: Spawn Point (${spawn[0].toFixed(2)}, ${spawn[1].toFixed(2)})`, 10, 20);
-    } else if (selectedObject === 'endpoint') {
-        ctx.fillText(`Selected: End Point (${endpoint[0].toFixed(2)}, ${endpoint[1].toFixed(2)})`, 10, 20);
-    }
 }
 
 /**
  * 更新当前选中对象的位置。
  */
 function update() {
-    if (selectedObject === 'surface' && selectedSurfaceIndex !== -1) {
+    if (selectedSurfaceIndex !== -1) {
         const surface = surfaces[selectedSurfaceIndex];
 
         if (keysPressed['a']) surface[0] -= 2; // 向左移动
@@ -133,18 +108,8 @@ function update() {
 
         if (keysPressed['ArrowRight']) surface[3] += Math.PI / 90; // 顺时针旋转
         if (keysPressed['ArrowLeft']) surface[3] -= Math.PI / 90; // 逆时针旋转
-    } else if (selectedObject === 'spawn') {
-        if (keysPressed['a']) spawn[0] -= 2;
-        if (keysPressed['d']) spawn[0] += 2;
-        if (keysPressed['w']) spawn[1] += 2;
-        if (keysPressed['s']) spawn[1] -= 2;
-    } else if (selectedObject === 'endpoint') {
-        if (keysPressed['a']) endpoint[0] -= 2;
-        if (keysPressed['d']) endpoint[0] += 2;
-        if (keysPressed['w']) endpoint[1] += 2;
-        if (keysPressed['s']) endpoint[1] -= 2;
-    }
 
+    }
     draw();
 }
 
@@ -157,10 +122,10 @@ function switchToNextPresetDirection() {
     const CIRCLE = Math.PI * 2;
     const surface = surfaces[selectedSurfaceIndex];
     const currentFacing = ((surface[3] % CIRCLE) + CIRCLE) % CIRCLE;
-    console.log(currentFacing);
+    console.log(CIRCLE, surface[3], currentFacing);
 
     for (let i = PRESET_DIRECTIONS.length - 1; i >= 0; i--) {
-        if (currentFacing === PRESET_DIRECTIONS[i]) {
+        if (Math.abs(currentFacing - PRESET_DIRECTIONS[i]) <= 0.01) {
             surface[3] = PRESET_DIRECTIONS[(i + 1) % 8];
             break;
         }
@@ -169,7 +134,7 @@ function switchToNextPresetDirection() {
             break;
         }
     }
-
+    console.log(surface[3]);
     draw();
 }
 
@@ -243,9 +208,7 @@ function switchVirtualSurface() {
  */
 function outputSurfaces() {
     const exportData = {
-        surfaces: surfaces,
-        spawn: spawn,
-        endpoint: endpoint
+        surfaces: surfaces
     };
     console.log(JSON.stringify(exportData));
 }
@@ -255,9 +218,7 @@ function outputSurfaces() {
  */
 function copyToClipboard() {
     const exportData = {
-        surfaces: surfaces,
-        spawn: spawn,
-        endpoint: endpoint
+        surfaces: surfaces
     };
     const jsonString = JSON.stringify(exportData);
     navigator.clipboard.writeText(jsonString).then(() => {
@@ -303,23 +264,13 @@ function undo() {
 function handleKeyDown(e) {
     e.preventDefault();
     keysPressed[e.key] = true;
-    
+
     if (e.key === 'Tab') {
         switchToNextPresetDirection();
-    } else if (e.key === `t`) {
-        if (selectedObject === 'surface') {
-            selectedObject = 'spawn';
-            selectedSurfaceIndex = -1; // 清除选中的 surface
-        } else if (selectedObject === 'spawn') {
-            selectedObject = 'endpoint';
-        } else {
-            selectedObject = 'surface';
-            selectedSurfaceIndex = 0; // 选中第一个 surface
-        }
-    } 
-    else if (selectedObject === 'surface' && e.key === ' ') {
+    }
+    else if (e.key === ' ') {
         selectedSurfaceIndex = (selectedSurfaceIndex + 1) % surfaces.length;
-    } else if (selectedObject === 'surface' && e.key === 'e') {
+    } else if (e.key === 'e') {
         selectedSurfaceIndex = (selectedSurfaceIndex - 1 + surfaces.length) % surfaces.length;
     } else if (e.key === 'c') {
         copyToClipboard();
@@ -355,15 +306,17 @@ function handleKeyUp(e) {
 function startEditor() {
     const mapDataInput = document.getElementById('mapDataInput');
     try {
-        surfaces = JSON.parse((() => {
-            if (mapDataInput.value === "") return "[]";
+        const mapData = JSON.parse((() => {
+            if (mapDataInput.value === "") return "{\"surfaces\":[]}";
             return mapDataInput.value;
         })());
-        for (let index = 0; index < surfaces.length; index++) {
-            const surface = surfaces[index];
-            if (surface.length === 4) surface.push(false); 
+        for (let index = 0; index < mapData.surfaces.length; index++) {
+            const surface = mapData.surfaces[index];
+            if (surface.length === 4) surface.push(false);
+            surfaces.push(surface);
         }
     } catch (error) {
+        console.log(error);
         alert('地图语法错误！');
         return;
     }

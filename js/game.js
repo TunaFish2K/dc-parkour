@@ -1,4 +1,8 @@
 // @ts-check
+
+const PLAYER_WIDTH = 10;
+const PLAYER_HEIGHT = 40;
+
 /**
  * @enum { number }
  * @readonly
@@ -122,6 +126,64 @@ export class Surface {
     }
 }
 
+export class GameObject {
+    /**
+     * @abstract
+     * @type { number }
+     */
+    width;
+    /**
+     * @abstract
+     * @type { number }
+     */
+    height;
+    /**
+     * @type { number }
+     */
+    x = 0;
+    /**
+     * @type { number }
+     */
+    y = 0;
+    /**
+     * @abstract
+     * @param { Game } game 
+     */
+    tick(game) {
+
+    }
+
+    /**
+     * @abstract
+     * @param { Game } game 
+     */
+    collide(game) {
+
+    }
+
+    /**
+     * @type { Map<string, typeof GameObject> }
+     */
+    static objectRegistry = new Map();
+    /**
+     * @param { string } name
+     * @param { typeof GameObject } object 
+     */
+    static register(name, object) {
+        this.objectRegistry.set(name, object);
+    }
+
+    /**
+     * 
+     * @param { string } name
+     * @returns { typeof GameObject } 
+     */
+    static get(name) {
+        // @ts-ignore
+        return this.objectRegistry.get(name);
+    }
+}
+
 export class GameMap {
     /**
      * @type { Surface[] }
@@ -143,6 +205,10 @@ export class GameMap {
      * @type { number }
      */
     endpointY;
+    /**
+     * @type { GameObject }
+     */
+    objects;
 
     /**
      * @param { string } url 
@@ -282,13 +348,15 @@ export class Game {
             if (this.player.y < surface.bottomY && nextY < surface.bottomY) continue;
 
             const top = surface.startY + Math.tan(surface.facing - Math.PI / 2) * (nextX - surface.startX);
-            this.context.fillStyle = "#00FFFF77";
-            this.context.fillRect(nextX - 5, 600 - top - 5, 10, 10);
+
             if (nextY < top) {
                 nextY = top;
                 this.player.onGround = true;
                 this.player.extraJump = 1;
-                console.log("awa");
+                if (this.DEBUG) {
+                    this.context.fillStyle = "#00FFFF77";
+                    this.context.fillRect(nextX - 5, 600 - nextY - 5, 10, 10);
+                }
             }
         }
         for (const surface of ceilings) {
@@ -300,7 +368,10 @@ export class Game {
             const bottom = surface.startY + Math.tan(surface.facing - Math.PI / 2) * (nextX - surface.startX);
             if (nextY > bottom) {
                 nextY = bottom;
-                console.log("qaq");
+                if (this.DEBUG) {
+                    this.context.fillStyle = "#FF000077";
+                    this.context.fillRect(nextX - 5, 600 - nextY - 5, 10, 10);
+                }
             }
         }
         this.player.x = nextX;
@@ -334,16 +405,16 @@ export class Game {
         // rerender
         this.context.fillStyle = "white";
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
-
+        let [cameraX, cameraY] = [this.player.x, this.player.y];
         // render player
         this.context.fillStyle = "black";
-        this.context.fillRect(this.player.x - 5, this.canvas.height - this.player.y, 10, -40);
+        this.context.fillRect(this.canvas.width / 2 - PLAYER_WIDTH / 2, this.canvas.height / 2 - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT);
         // render surfaces
         this.context.strokeStyle = "black";
         for (const surface of this.map.surfaces) {
             this.context.beginPath();
-            this.context.moveTo(surface.startX, this.canvas.height - surface.startY);
-            this.context.lineTo(surface.endX, this.canvas.height - surface.endY);
+            this.context.moveTo(surface.startX - cameraX, this.canvas.height - (surface.startY - cameraY));
+            this.context.lineTo(surface.endX - cameraX, this.canvas.height - (surface.endY - cameraY));
             this.context.stroke();
         }
         // debug
