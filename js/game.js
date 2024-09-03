@@ -37,10 +37,14 @@ export class Pool {
      * @returns { Promise<Pool> } 
      */
     static async load(url) {
-        const raw = await (await fetch(url)).json();
+        const raw = await (await fetch(url, {
+            "mode": "no-cors"
+        })).json();
         const result = new Pool();
         for (const value of raw.values) {
-            result.values.push(await (await fetch(value)).json());
+            result.values.push(await (await fetch(value, {
+                "mode": "no-cors"
+            })).json());
         }
         return result; 
     }
@@ -259,7 +263,9 @@ export class GameMap {
      * @returns { Promise<GameMap> }
      */
     static async load(url) {
-        const obj = await (await fetch(url)).json();
+        const obj = await (await fetch(url, {
+            "mode": "no-cors"
+        })).json();
         return this.loadFromJSON(obj);
     }
 
