@@ -14,6 +14,8 @@ export const SurfaceType = {
     Win: 3
 }
 
+
+
 /**
  * 
  * @param { number } a 
@@ -22,6 +24,48 @@ export const SurfaceType = {
  */
 function mod(a, b) {
     return ((a % b) + b) % b;
+}
+
+export class Pool {
+    /**
+     * @type { any[] }
+     */
+    values = [];
+    /**
+     * 
+     * @param { string } url
+     * @returns { Promise<Pool> } 
+     */
+    static async load(url) {
+        const raw = await (await fetch(url)).json();
+        const result = new Pool();
+        for (const value of raw.values) {
+            result.values.push(await (await fetch(value)).json());
+        }
+        return result; 
+    }
+
+    /**
+     * @returns { GameMap[] }
+     */
+    create() {
+        /**
+         * @type { any[] }
+         */
+        let repeatPool = [];
+        /**
+         * @type { GameMap[] }
+         */
+        let result = [];
+        for (let i = 0; i < 5; i++) {
+            if (repeatPool.length <= 0) repeatPool = this.values.slice();
+            const index = Math.floor(Math.random() * repeatPool.length);
+            result.push(GameMap.loadFromJSON(repeatPool.splice(index, 1)[0])); 
+        }
+        // @ts-ignore
+        result[0].surfaces.push(Surface.fromArray([result[0].leftX, result[0].bottomY, result[0].topY - result[0].bottomY, 0, false]));
+        return result;
+    }
 }
 
 export class Surface {
@@ -216,11 +260,44 @@ export class GameMap {
      */
     static async load(url) {
         const obj = await (await fetch(url)).json();
+        return this.loadFromJSON(obj);
+    }
+
+    /**
+     * @param { any } obj 
+     * @returns { GameMap }
+     */
+    static loadFromJSON(obj) {
         const result = new GameMap();
         result.surfaces = obj.surfaces.map(Surface.fromArray);
-        [result.spawnX, result.spawnY] = obj.spawn;
-        [result.endpointX, result.endpointY] = obj.endpoint;
+        result.calculateBox();
         return result;
+    }
+
+    /**
+     * @type { number }
+     */
+    leftX = 0;
+    /**
+     * @type { number }
+     */
+    rightX = 0;
+    /**
+     * @type { number }
+     */
+    bottomY = 0;
+    /**
+     * @type { number }
+     */
+    topY = 0;
+    calculateBox() {
+        for (const surface of this.surfaces) {
+            if (surface.virtual) continue;
+            this.leftX = Math.min(this.leftX, surface.leftX);
+            this.rightX = Math.max(this.rightX, surface.rightX);
+            this.bottomY = Math.min(this.bottomY, surface.bottomY);
+            this.topY = Math.max(this.topY, surface.topY);
+        }
     }
 }
 
@@ -253,6 +330,10 @@ export class Player {
 
 export class Game {
     /**
+     * @type { boolean }
+     */
+    active = true;
+    /**
      * @type { HTMLCanvasElement }
      */
     canvas;
@@ -261,9 +342,27 @@ export class Game {
      */
     context;
     /**
-     * @type { GameMap }
+     * @type { number }
      */
-    map;
+    cameraX;
+    /**
+     * @type { number }
+     */
+    cameraY;
+    /**
+     * @type { GameMap[] }
+     */
+    currentMapSequence;
+    /**
+     * @type { number }
+     */
+    currentMapIndex;
+    /**
+     * @returns { GameMap }
+     */
+    get map() {
+        return this.currentMapSequence[this.currentMapIndex];
+    }
     /**
      * @type { boolean }
      */
@@ -347,30 +446,32 @@ export class Game {
             if (this.player.y > surface.topY && nextY > surface.topY) continue;
             if (this.player.y < surface.bottomY && nextY < surface.bottomY) continue;
 
-            const top = surface.startY + Math.tan(surface.facing - Math.PI / 2) * (nextX - surface.startX);
+            const curTop = surface.startY + Math.tan(surface.facing - Math.PI / 2) * (this.player.x - surface.startX)
+            const nextTop = surface.startY + Math.tan(surface.facing - Math.PI / 2) * (nextX - surface.startX);
 
-            if (nextY < top) {
-                nextY = top;
+            if (this.player.y > curTop && nextY <= nextTop) {
+                nextY = nextTop + 1;
                 this.player.onGround = true;
                 this.player.extraJump = 1;
-                if (this.DEBUG) {
-                    this.context.fillStyle = "#00FFFF77";
-                    this.context.fillRect(nextX - 5, 600 - nextY - 5, 10, 10);
-                }
             }
         }
         for (const surface of ceilings) {
             if (this.player.x > surface.rightX && nextX > surface.rightX) continue;
             if (this.player.x < surface.leftX && nextX < surface.leftX) continue;
-            if (this.player.y > surface.topY && nextY > surface.topY) continue;
-            if (this.player.y < surface.bottomY && nextY < surface.bottomY) continue;
+            if (this.player.y + PLAYER_HEIGHT > surface.topY && nextY + PLAYER_HEIGHT > surface.topY) continue;
+            if (this.player.y + PLAYER_HEIGHT < surface.bottomY && nextY + PLAYER_HEIGHT < surface.bottomY) continue;
 
-            const bottom = surface.startY + Math.tan(surface.facing - Math.PI / 2) * (nextX - surface.startX);
-            if (nextY > bottom) {
-                nextY = bottom;
-                if (this.DEBUG) {
-                    this.context.fillStyle = "#FF000077";
-                    this.context.fillRect(nextX - 5, 600 - nextY - 5, 10, 10);
+            const curBottom = surface.startY + Math.tan(surface.facing - Math.PI / 2) * (this.player.x - surface.startX)
+            const nextBottom = surface.startY + Math.tan(surface.facing - Math.PI / 2) * (nextX - surface.startX);
+            if (this.player.y + PLAYER_HEIGHT < curBottom && nextY + PLAYER_HEIGHT >= nextBottom) {
+                nextY = nextBottom - 1 - PLAYER_HEIGHT;
+            }
+            else if (nextY + PLAYER_HEIGHT > curBottom && nextY <= nextBottom) {
+                if (this.player.x >= surface.rightX) {
+                    nextX = surface.rightX + 1;
+                }
+                else {
+                    nextX = surface.leftX - 1;
                 }
             }
         }
@@ -379,7 +480,24 @@ export class Game {
     }
 
     logic() {
+        if (!this.active) return;
         if (this.player.y < -50) this.spawn();
+        if (this.player.x < this.map.leftX) {
+            if (this.currentMapIndex > 0) {
+                this.currentMapIndex--;
+                this.back();
+                return;
+            }
+        }
+        if (this.player.x > this.map.rightX) {
+            if (this.currentMapIndex >= 4) {
+                alert("恭喜通关!");
+                this.active = false;
+            }
+            this.currentMapIndex++;
+            this.next();
+            return;
+        }
         this.player.onGround = false;
         if (this.keyEvents.walkingLeft && !this.keyEvents.walkingRight) {
             this.player.speedX = -10;
@@ -402,19 +520,42 @@ export class Game {
     }
 
     render() {
+        if (!this.active) return;
         // rerender
         this.context.fillStyle = "white";
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
-        let [cameraX, cameraY] = [this.player.x, this.player.y];
+        [this.cameraX, this.cameraY] = [this.player.x, this.player.y];
+        if (this.map.rightX - this.map.leftX > this.canvas.width) {
+            if (this.cameraX - this.canvas.width / 2 < this.map.leftX) {
+                this.cameraX = this.map.leftX + this.canvas.width / 2;
+            }
+
+            if (this.cameraX + this.canvas.width / 2 > this.map.rightX) {
+                this.cameraX = this.map.rightX - this.canvas.width / 2;
+            }
+        } else {
+            this.cameraX = this.canvas.width / 2;
+        }
+        if (this.map.topY - this.map.bottomY > this.canvas.height) {
+            if (this.cameraY - this.canvas.height / 2 < this.map.bottomY) {
+                this.cameraY = this.map.bottomY + this.canvas.height / 2;
+            }
+
+            if (this.cameraY + this.canvas.height / 2 > this.map.topY) {
+                this.cameraY = this.map.topY - this.canvas.height / 2;
+            }
+        } else {
+            this.cameraY = this.canvas.height / 2;
+        }
         // render player
         this.context.fillStyle = "black";
-        this.context.fillRect(this.canvas.width / 2 - PLAYER_WIDTH / 2, this.canvas.height / 2 - PLAYER_HEIGHT / 2, PLAYER_WIDTH, PLAYER_HEIGHT);
+        this.context.fillRect(this.player.x - this.cameraX + this.canvas.width / 2 - PLAYER_WIDTH / 2, (this.canvas.height - this.player.y) + this.cameraY - this.canvas.height / 2, PLAYER_WIDTH, -PLAYER_HEIGHT);
         // render surfaces
         this.context.strokeStyle = "black";
         for (const surface of this.map.surfaces) {
             this.context.beginPath();
-            this.context.moveTo(surface.startX - cameraX, this.canvas.height - (surface.startY - cameraY));
-            this.context.lineTo(surface.endX - cameraX, this.canvas.height - (surface.endY - cameraY));
+            this.context.moveTo(surface.startX - this.cameraX + this.canvas.width / 2, this.canvas.height - (surface.startY - this.cameraY) - this.canvas.height / 2);
+            this.context.lineTo(surface.endX - this.cameraX + this.canvas.width / 2, this.canvas.height - (surface.endY - this.cameraY) - this.canvas.height / 2);
             this.context.stroke();
         }
         // debug
@@ -449,15 +590,23 @@ export class Game {
         this.context.font = "20px Arial";
         this.context.textAlign = "center";
         this.context.textBaseline = "top";
-        this.context.fillText(`mouse: ${this.mouseX} ${this.canvas.height - this.mouseY}`, this.canvas.width / 2, 0);
+        this.context.fillText(`mouse: ${this.mouseX + this.cameraX - this.canvas.width / 2} ${this.canvas.height - this.mouseY + this.cameraY - this.canvas.height / 2}`, this.canvas.width / 2, 0);
         this.context.fillText(`player: ${this.player.x} ${this.player.y}`, this.canvas.width / 2, 25);
+        this.context.fillText(`camera: ${this.cameraX} ${this.cameraY}`, this.canvas.width / 2, 50);
+        this.context.fillText(`level: ${this.currentMapIndex}`, this.canvas.width / 2, 75);
+    }
+
+    next() {
+        this.player.x = this.map.leftX;
+    }
+
+    back() {
+        this.player.x = this.map.rightX;
     }
 
     spawn() {
-        this.player.x = this.map.spawnX;
-        this.player.y = this.map.spawnY;
-        this.player.speedY = 0;
-        console.log("spawn");
+        this.player.x = this.map.leftX + 20;
+        this.player.y = 300;
     }
 }
 

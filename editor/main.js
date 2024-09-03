@@ -223,16 +223,6 @@ function switchVirtualSurface() {
 }
 
 /**
- * 导出所有边的数据、出生点和终点的数据，以 JSON 格式输出到控制台。
- */
-function outputSurfaces() {
-    const exportData = {
-        surfaces: surfaces
-    };
-    console.log(JSON.stringify(exportData));
-}
-
-/**
  * 将所有边的数据、出生点和终点的数据以 JSON 格式复制到剪贴板。
  */
 function copyToClipboard() {
@@ -276,6 +266,30 @@ function undo() {
 }
 
 
+function download() {
+    const exportData = {
+        surfaces: surfaces
+    };
+    // 创建一个Blob对象，类型为纯文本
+    const blob = new Blob([JSON.stringify(exportData)], { type: "application/json" });
+  
+    // 创建一个指向该Blob的URL
+    const url = URL.createObjectURL(blob);
+  
+    // 创建一个a标签用于下载
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = "map.json"; // 设置下载的文件名
+    document.body.appendChild(a); // 将a标签添加到页面中
+  
+    // 触发下载
+    a.click();
+  
+    // 清理：移除a标签，并释放Blob对象的URL
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
 /**
  * 处理键盘按下事件。
  * @param {KeyboardEvent} e - 键盘事件对象
@@ -291,10 +305,13 @@ function handleKeyDown(e) {
         selectedSurfaceIndex = (selectedSurfaceIndex + 1) % surfaces.length;
     } else if (e.key === 'e') {
         selectedSurfaceIndex = (selectedSurfaceIndex - 1 + surfaces.length) % surfaces.length;
-    } else if (e.key === 'c') {
+    } else if (e.key === 'y' && selectedSurfaceIndex !== -1) {
+        surfaces[selectedSurfaceIndex][1] = 300;
+    } 
+    else if (e.key === 'c') {
         copyToClipboard();
     } else if (e.key === 'p') {
-        outputSurfaces();
+        download();
     } else if (e.key === 'Enter') {
         addSurface();
     } else if (e.key === 'r') {
