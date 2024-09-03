@@ -10,6 +10,7 @@
 const HEIGHT = 600;
 
 let canvas, ctx, surfaces = [], selectedSurfaceIndex, keysPressed, history;
+let camera = [400, 300];
 
 const PRESET_DIRECTIONS = [
     0,
@@ -53,8 +54,8 @@ function drawSurface(surface) {
     const endY = startY + Math.sin(facing - Math.PI / 2) * length;
 
     ctx.beginPath();
-    ctx.moveTo(startX, HEIGHT - startY);
-    ctx.lineTo(endX, HEIGHT - endY);
+    ctx.moveTo(startX - camera[0] + 400, HEIGHT - startY + camera[1] - 300);
+    ctx.lineTo(endX - camera[0] + 400, HEIGHT - endY + camera[1] - 300);
     ctx.stroke();
 
     if (facing > 0 && facing < Math.PI) ctx.fillStyle = "#0000FF";
@@ -64,8 +65,8 @@ function drawSurface(surface) {
     const centerX = (startX + endX) / 2;
     const centerY = (startY + endY) / 2;
     ctx.beginPath();
-    ctx.moveTo(centerX, HEIGHT - centerY);
-    ctx.lineTo(centerX + Math.cos(facing) * 50, HEIGHT - (centerY + Math.sin(facing) * 50));
+    ctx.moveTo(centerX - camera[0] + 400, HEIGHT - centerY + camera[1] - 300);
+    ctx.lineTo(centerX + Math.cos(facing) * 50 - camera[0] + 400, HEIGHT - (centerY + Math.sin(facing) * 50) + camera[1] - 300);
     ctx.stroke();
 }
 
@@ -79,6 +80,20 @@ function draw() {
         ctx.strokeStyle = index === selectedSurfaceIndex ? (surface[4] ? 'pink' : 'red') : (surface[4] ? 'gray' : 'black');
         drawSurface(surface);
     });
+    ctx.strokeStyle = "#000000";
+    ctx.beginPath();
+    ctx.moveTo(800, 600 - 0 + camera[1] - 300);
+    ctx.lineTo(0, 600 - 0 + camera[1] - 300);
+    ctx.stroke();
+    ctx.beginPath();
+    ctx.moveTo(0 - camera[0] + 400, 0);
+    ctx.lineTo(0 - camera[0] + 400, 600);
+    ctx.stroke();
+    ctx.fillStyle = 'black';
+    ctx.fillText(
+        `Camera: (${camera[0]}, ${camera[1]})`,
+        10, 20
+    );
     if (selectedSurfaceIndex < 0) return;
     const surface = surfaces[selectedSurfaceIndex];
     if (!surface) return;
@@ -86,7 +101,7 @@ function draw() {
     ctx.fillStyle = 'black';
     ctx.fillText(
         `Selected Surface: Start (${startX.toFixed(2)}, ${startY.toFixed(2)}), Length: ${length.toFixed(2)}, Facing: ${facing.toFixed(2)} rad`,
-        10, 20
+        10, 40
     );
 
 }
@@ -95,6 +110,10 @@ function draw() {
  * 更新当前选中对象的位置。
  */
 function update() {
+    if (keysPressed['j']) camera[0] -= 2; // 向左移动
+    if (keysPressed['l']) camera[0] += 2; // 向右移动
+    if (keysPressed['i']) camera[1] += 2; // 向上移动
+    if (keysPressed['k']) camera[1] -= 2; // 向下移动
     if (selectedSurfaceIndex !== -1) {
         const surface = surfaces[selectedSurfaceIndex];
 
