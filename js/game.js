@@ -491,7 +491,7 @@ export class Game {
 
     logic() {
         if (!this.active) return;
-        if (this.player.y < -50) this.spawn();
+        if (this.player.y < this.map.bottomY - 100) this.spawn();
         if (this.player.x < this.map.leftX) {
             if (this.currentMapIndex > 0) {
                 this.currentMapIndex--;
