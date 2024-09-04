@@ -443,10 +443,10 @@ export class Game {
             if (this.player.y > surface.topY && nextY > surface.topY) continue;
             if (this.player.y < surface.bottomY && nextY < surface.bottomY) continue;
 
-            if (mod(surface.facing, (Math.PI * 2)) === 0 && nextX < surface.leftX) { // 不许往右
+            if (mod(surface.facing, (Math.PI * 2)) === 0 && this.player.x > surface.leftX && nextX <= surface.leftX) { // 不许往左
                 nextX = surface.leftX + 1;
             }
-            if (mod(surface.facing, (Math.PI * 2)) !== 0 && nextX > surface.leftX) { // 不许往左
+            if (mod(surface.facing, (Math.PI * 2)) !== 0 && this.player.x < surface.leftX && nextX >= surface.leftX) { // 不许往右
                 nextX = surface.leftX - 1;
             }
         }
@@ -551,9 +551,6 @@ export class Game {
                 this.cameraY = this.map.bottomY + this.canvas.height / 2;
             }
 
-            if (this.cameraY + this.canvas.height / 2 > this.map.topY) {
-                this.cameraY = this.map.topY - this.canvas.height / 2;
-            }
         } else {
             this.cameraY = this.canvas.height / 2;
         }
