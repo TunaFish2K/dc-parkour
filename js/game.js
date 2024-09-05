@@ -433,21 +433,30 @@ export class Game {
         return result;
     }
 
+    /**
+     * if Date.now() is after, you can't wall jump.
+     * @type { number }
+     */
+    wallJumpCountdown = 0;
+
     movement() {
         const { floors, ceilings, walls } = this.getRelevantSurfaces();
         let nextX = this.player.x + this.player.speedX;
         let nextY = this.player.y + this.player.speedY;
+
         for (const surface of walls) {
             if (this.player.x > surface.rightX && nextX > surface.rightX) continue;
             if (this.player.x < surface.leftX && nextX < surface.leftX) continue;
-            if (this.player.y > surface.topY && nextY > surface.topY) continue;
-            if (this.player.y < surface.bottomY && nextY < surface.bottomY) continue;
+            if (this.player.y > surface.topY && nextY + PLAYER_HEIGHT > surface.topY) continue;
+            if (this.player.y < surface.bottomY && nextY + PLAYER_HEIGHT < surface.bottomY) continue;
 
             if (mod(surface.facing, (Math.PI * 2)) === 0 && this.player.x > surface.leftX && nextX <= surface.leftX) { // 不许往左
                 nextX = surface.leftX + 1;
+                this.wallJumpCountdown = Date.now() + 100;
             }
             if (mod(surface.facing, (Math.PI * 2)) !== 0 && this.player.x < surface.leftX && nextX >= surface.leftX) { // 不许往右
                 nextX = surface.leftX - 1;
+                this.wallJumpCountdown = Date.now() + 100;
             }
         }
         for (const surface of floors) {
@@ -522,8 +531,10 @@ export class Game {
         this.player.speedY = Math.max(-10, this.player.speedY - 1.5);
         if (this.keyEvents.jumping) {
             this.keyEvents.jumping = false;
-            if (this.player.onGround || this.player.extraJump > 0 || this.player.extraJump === -1) {
-                if (!this.player.onGround && this.player.extraJump !== -1) this.player.extraJump--;
+            const canWallJump = this.wallJumpCountdown >= Date.now();
+            if (this.player.onGround || this.player.extraJump > 0 || this.player.extraJump === -1 || canWallJump) {
+                if (!this.player.onGround && !canWallJump && this.player.extraJump !== -1) this.player.extraJump--;
+                if (canWallJump) this.player.extraJump = this.player.maxExtraJump;
                 this.player.speedY = 20;
             }
         }
