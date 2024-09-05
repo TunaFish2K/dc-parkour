@@ -11,6 +11,7 @@ const HEIGHT = 600;
 
 let canvas, ctx, surfaces = [], selectedSurfaceIndex, keysPressed, history;
 let camera = [400, 300];
+let features = [];
 
 const PRESET_DIRECTIONS = [
     0,
@@ -227,7 +228,8 @@ function switchVirtualSurface() {
  */
 function copyToClipboard() {
     const exportData = {
-        surfaces: surfaces
+        surfaces: surfaces,
+        features
     };
     const jsonString = JSON.stringify(exportData);
     navigator.clipboard.writeText(jsonString).then(() => {
@@ -268,7 +270,8 @@ function undo() {
 
 function download() {
     const exportData = {
-        surfaces: surfaces
+        surfaces: surfaces,
+        features
     };
     // 创建一个Blob对象，类型为纯文本
     const blob = new Blob([JSON.stringify(exportData)], { type: "application/json" });
@@ -343,7 +346,7 @@ function startEditor() {
     const mapDataInput = document.getElementById('mapDataInput');
     try {
         const mapData = JSON.parse((() => {
-            if (mapDataInput.value === "") return "{\"surfaces\":[]}";
+            if (mapDataInput.value === "") return "{\"surfaces\":[], \"features\":[]}";
             return mapDataInput.value;
         })());
         for (let index = 0; index < mapData.surfaces.length; index++) {
@@ -351,6 +354,7 @@ function startEditor() {
             if (surface.length === 4) surface.push(false);
             surfaces.push(surface);
         }
+        features = mapData.features ?? [];
     } catch (error) {
         console.log(error);
         alert('地图语法错误！');

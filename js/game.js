@@ -632,7 +632,7 @@ export class Game {
     }
 
     next() {
-        this.player.x = this.map.leftX;
+        this.spawn();
     }
 
     back() {
