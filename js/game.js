@@ -62,6 +62,7 @@ export class Pool {
          * @type { GameMap[] }
          */
         let result = [];
+        result.push(GameMap.loadFromJSON(this.values[0]));
         for (let i = 0; i < 5; i++) {
             if (repeatPool.length <= 0) repeatPool = this.values.slice();
             const index = Math.floor(Math.random() * repeatPool.length);
@@ -458,6 +459,8 @@ export class Game {
         let nextX = this.player.x + this.player.speedX;
         let nextY = this.player.y + this.player.speedY;
 
+        if (nextX <= this.map.leftX) nextX = this.map.leftX + 1;
+
         for (const surface of walls) {
             if (this.player.x > surface.rightX && nextX > surface.rightX) continue;
             if (this.player.x < surface.leftX && nextX < surface.leftX) continue;
@@ -514,18 +517,12 @@ export class Game {
 
     logic() {
         if (!this.active) return;
-        if (this.player.y < this.map.bottomY - 100) this.spawn();
-        if (this.player.x < this.map.leftX) {
-            if (this.currentMapIndex > 0) {
-                this.currentMapIndex--;
-                this.back();
-                return;
-            }
-        }
+        if (this.player.y < this.map.bottomY - 40) this.spawn();
         if (this.player.x > this.map.rightX) {
-            if (this.currentMapIndex >= 4) {
+            if (this.currentMapIndex >= 5) {
                 alert("恭喜通关!");
                 this.active = false;
+                return;
             }
             this.currentMapIndex++;
             this.next();
@@ -574,14 +571,16 @@ export class Game {
         } else {
             this.cameraX = this.canvas.width / 2;
         }
-        /*if (this.map.topY - this.map.bottomY > this.canvas.height) {
-            if (this.cameraY - this.canvas.height / 2 < this.map.bottomY) {
-                this.cameraY = this.map.bottomY + this.canvas.height / 2;
+        if (this.map.features.indexOf("no_y_border_align") === -1) {
+            if (this.map.topY - this.map.bottomY > this.canvas.height) {
+                if (this.cameraY - this.canvas.height / 2 < this.map.bottomY) {
+                    this.cameraY = this.map.bottomY + this.canvas.height / 2;
+                }
+    
+            } else {
+                this.cameraY = this.canvas.height / 2;
             }
-
-        } else {
-            this.cameraY = this.canvas.height / 2;
-        }*/
+        }
         // render player
         this.context.fillStyle = "black";
         this.context.fillRect(this.player.x - this.cameraX + this.canvas.width / 2 - PLAYER_WIDTH / 2, (this.canvas.height - this.player.y) + this.cameraY - this.canvas.height / 2, PLAYER_WIDTH, -PLAYER_HEIGHT);

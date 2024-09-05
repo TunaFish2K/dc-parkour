@@ -276,6 +276,7 @@
     ],
     "features": [
         "fucking_camera",
-        "spawn_offset_x+"
+        "spawn_offset_x+",
+        "no_y_border_align"
     ]
 }
