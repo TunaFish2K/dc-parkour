@@ -45,6 +45,7 @@ export class Pool {
             result.values.push(await (await fetch(value, {
                 "mode": "no-cors"
             })).json());
+            result.values[result.values.length - 1].name = value;
         }
         return result; 
     }
@@ -64,7 +65,9 @@ export class Pool {
         for (let i = 0; i < 5; i++) {
             if (repeatPool.length <= 0) repeatPool = this.values.slice();
             const index = Math.floor(Math.random() * repeatPool.length);
-            result.push(GameMap.loadFromJSON(repeatPool.splice(index, 1)[0])); 
+            const obj = repeatPool.splice(index, 1)[0]
+            result.push(GameMap.loadFromJSON(obj)); 
+            result[result.length - 1].name = obj.name;
         }
         // @ts-ignore
         result[0].surfaces.push(Surface.fromArray([result[0].leftX, result[0].bottomY, result[0].topY - result[0].bottomY, 0, false]));
@@ -234,9 +237,17 @@ export class GameObject {
 
 export class GameMap {
     /**
+     * @type { string }
+     */
+    name;
+    /**
      * @type { Surface[] }
      */
     surfaces;
+    /**
+     * @type { string[] }
+     */
+    features;
     /**
      * @type { number }
      */
@@ -266,7 +277,9 @@ export class GameMap {
         const obj = await (await fetch(url, {
             "mode": "no-cors"
         })).json();
-        return this.loadFromJSON(obj);
+        const result = this.loadFromJSON(obj);
+        result.name = url;
+        return result;
     }
 
     /**
@@ -276,6 +289,7 @@ export class GameMap {
     static loadFromJSON(obj) {
         const result = new GameMap();
         result.surfaces = obj.surfaces.map(Surface.fromArray);
+        result.features = obj.features ?? [];
         result.calculateBox();
         return result;
     }
@@ -546,6 +560,9 @@ export class Game {
         this.context.fillStyle = "white";
         this.context.fillRect(0, 0, this.canvas.width, this.canvas.height);
         [this.cameraX, this.cameraY] = [this.player.x, this.player.y];
+        if (this.map.features.indexOf("fucking_camera") !== -1) {
+            this.cameraY += 180;
+        }
         if (this.map.rightX - this.map.leftX > this.canvas.width) {
             if (this.cameraX - this.canvas.width / 2 < this.map.leftX) {
                 this.cameraX = this.map.leftX + this.canvas.width / 2;
@@ -557,14 +574,14 @@ export class Game {
         } else {
             this.cameraX = this.canvas.width / 2;
         }
-        if (this.map.topY - this.map.bottomY > this.canvas.height) {
+        /*if (this.map.topY - this.map.bottomY > this.canvas.height) {
             if (this.cameraY - this.canvas.height / 2 < this.map.bottomY) {
                 this.cameraY = this.map.bottomY + this.canvas.height / 2;
             }
 
         } else {
             this.cameraY = this.canvas.height / 2;
-        }
+        }*/
         // render player
         this.context.fillStyle = "black";
         this.context.fillRect(this.player.x - this.cameraX + this.canvas.width / 2 - PLAYER_WIDTH / 2, (this.canvas.height - this.player.y) + this.cameraY - this.canvas.height / 2, PLAYER_WIDTH, -PLAYER_HEIGHT);
@@ -623,7 +640,9 @@ export class Game {
     }
 
     spawn() {
+        console.log(this.map.name);
         this.player.x = this.map.leftX + 20;
+        if (this.map.features.indexOf("spawn_offset_x+") !== -1) this.player.x += 100;
         this.player.y = 301;
     }
 }
