@@ -6,9 +6,18 @@ function getPoolURL() {
     return url.searchParams.get("pool");
 }
 
+async function getMapSequence() {
+    const url = new URL(document.URL);
+    if (url.searchParams.has("map")) {
+        document.getElementById("open_editor").hidden = true;
+        return [GameMap.loadFromJSON(JSON.parse(window.atob(url.searchParams.get("map"))))];
+    }
+    return (await Pool.load(getPoolURL())).create();
+}
+
 async function main() {
     const game = window.game =new Game(document.getElementById("game"), new Player());
-    game.currentMapSequence = (await Pool.load(getPoolURL())).create();
+    game.currentMapSequence = await getMapSequence();
     game.currentMapIndex = 0;
     game.spawn();
     setInterval(game.render.bind(game), 20);

@@ -10,10 +10,22 @@
             display: block;
             margin: 0 auto;
         }
+        body, html {
+            width: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        button {
+            width: 200px;
+            height: 80px;
+        }
     </style>
 </head>
 <body>
     <canvas id="game" width="800" height="600"></canvas>
     <script src="js/main.js" type="module"></script>
+    <a href="/editor/index.html" id="open_editor"><button>打开地图编辑器</button></a>
 </body>
 </html>

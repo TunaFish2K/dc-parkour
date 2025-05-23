@@ -1,7 +1,21 @@
 // @ts-check
 
-const PLAYER_WIDTH = 10;
+const PLAYER_WIDTH = 40;
 const PLAYER_HEIGHT = 40;
+
+const PLAYER_BORDER_WIDTH = 5;
+
+const PLAYER_ASPEED_X = 1;
+const PLAYER_STOP_ASPEED_X = 2;
+const PLAYER_STOP_ASPEED_Y = 1.3;
+
+const PLAYER_SPEED_CAP_X = 10;
+
+const JUMP_SPEED = 20;
+
+const BOUNCE_YSPEED = 25;
+const BOUNCE_XSPEED = 10;
+const BOUNCE_CAP = 3;
 
 /**
  * @enum { number }
@@ -47,7 +61,7 @@ export class Pool {
             })).json());
             result.values[result.values.length - 1].name = value;
         }
-        return result; 
+        return result;
     }
 
     /**
@@ -67,7 +81,7 @@ export class Pool {
             if (repeatPool.length <= 0) repeatPool = this.values.slice();
             const index = Math.floor(Math.random() * repeatPool.length);
             const obj = repeatPool.splice(index, 1)[0]
-            result.push(GameMap.loadFromJSON(obj)); 
+            result.push(GameMap.loadFromJSON(obj));
             result[result.length - 1].name = obj.name;
         }
         // @ts-ignore
@@ -350,6 +364,10 @@ export class Player {
     /**
      * @type { number }
      */
+    bounceTime = 0;
+    /**
+     * @type { number }
+     */
     maxExtraJump = 1;
 }
 
@@ -453,6 +471,10 @@ export class Game {
      * @type { number }
      */
     wallJumpCountdown = 0;
+    /**
+     * @type { Surface | undefined }
+     */
+    surfaceCollided;
 
     movement() {
         const { floors, ceilings, walls } = this.getRelevantSurfaces();
@@ -470,15 +492,17 @@ export class Game {
             if (mod(surface.facing, (Math.PI * 2)) === 0 && this.player.x > surface.leftX && nextX <= surface.leftX) { // 不许往左
                 nextX = surface.leftX + 1;
                 this.wallJumpCountdown = Date.now() + 100;
+                this.surfaceCollided = surface;
             }
             if (mod(surface.facing, (Math.PI * 2)) !== 0 && this.player.x < surface.leftX && nextX >= surface.leftX) { // 不许往右
                 nextX = surface.leftX - 1;
                 this.wallJumpCountdown = Date.now() + 100;
+                this.surfaceCollided = surface;
             }
         }
         for (const surface of floors) {
-            if (this.player.x > surface.rightX && nextX > surface.rightX) continue;
-            if (this.player.x < surface.leftX && nextX < surface.leftX) continue;
+            if (this.player.x > surface.rightX + PLAYER_WIDTH / 2 && nextX > surface.rightX  + PLAYER_WIDTH / 2) continue;
+            if (this.player.x < surface.leftX - PLAYER_WIDTH / 2 && nextX < surface.leftX - PLAYER_WIDTH / 2) continue;
             if (this.player.y > surface.topY && nextY > surface.topY) continue;
             if (this.player.y < surface.bottomY && nextY < surface.bottomY) continue;
 
@@ -489,11 +513,12 @@ export class Game {
                 nextY = nextTop + 1;
                 this.player.onGround = true;
                 this.player.extraJump = this.player.maxExtraJump;
+                this.player.bounceTime = BOUNCE_CAP;
             }
         }
         for (const surface of ceilings) {
-            if (this.player.x > surface.rightX && nextX > surface.rightX) continue;
-            if (this.player.x < surface.leftX && nextX < surface.leftX) continue;
+            if (this.player.x > surface.rightX + PLAYER_WIDTH / 2 && nextX > surface.rightX + PLAYER_WIDTH / 2) continue;
+            if (this.player.x < surface.leftX - PLAYER_WIDTH / 2 && nextX < surface.leftX - PLAYER_WIDTH / 2) continue;
             if (this.player.y + PLAYER_HEIGHT > surface.topY && nextY + PLAYER_HEIGHT > surface.topY) continue;
             if (this.player.y + PLAYER_HEIGHT < surface.bottomY && nextY + PLAYER_HEIGHT < surface.bottomY) continue;
 
@@ -517,36 +542,63 @@ export class Game {
 
     logic() {
         if (!this.active) return;
+
+        if (this.currentMapIndex >= this.currentMapSequence.length) {
+            alert("恭喜通关!");
+            this.active = false;
+            return;
+        }
+
         if (this.player.y < this.map.bottomY - 40) this.spawn();
         if (this.player.x > this.map.rightX) {
-            if (this.currentMapIndex >= 5) {
-                alert("恭喜通关!");
-                this.active = false;
-                return;
-            }
             this.currentMapIndex++;
             this.next();
             return;
         }
         this.player.onGround = false;
         if (this.keyEvents.walkingLeft && !this.keyEvents.walkingRight) {
-            this.player.speedX = -10;
+            if (this.player.speedX > -PLAYER_SPEED_CAP_X) {
+                this.player.speedX = Math.max(-PLAYER_SPEED_CAP_X, this.player.speedX - PLAYER_ASPEED_X);
+            }
         }
         else if (this.keyEvents.walkingRight && !this.keyEvents.walkingLeft) {
-            this.player.speedX = 10;
+            if (this.player.speedX < PLAYER_SPEED_CAP_X) {
+                this.player.speedX = Math.min(PLAYER_SPEED_CAP_X, this.player.speedX + PLAYER_ASPEED_X);
+            }
         }
         else {
-            this.player.speedX = 0;
+            if (this.player.speedX > 0) {
+                this.player.speedX = Math.max(0, this.player.speedX - PLAYER_STOP_ASPEED_X);
+            } else if (this.player.speedX < 0) {
+                this.player.speedX = Math.min(0, this.player.speedX + PLAYER_STOP_ASPEED_X);
+            }
         }
         this.movement();
-        this.player.speedY = Math.max(-10, this.player.speedY - 1.5);
+        this.player.speedY = Math.max(-10, this.player.speedY - PLAYER_STOP_ASPEED_Y);
         if (this.keyEvents.jumping) {
             this.keyEvents.jumping = false;
             const canWallJump = this.wallJumpCountdown >= Date.now();
             if (this.player.onGround || this.player.extraJump > 0 || this.player.extraJump === -1 || canWallJump) {
-                if (!this.player.onGround && !canWallJump && this.player.extraJump !== -1) this.player.extraJump--;
-                if (canWallJump) this.player.extraJump = this.player.maxExtraJump;
-                this.player.speedY = 20;
+                if (canWallJump && this.player.bounceTime > 0) {
+                    this.player.extraJump = this.player.maxExtraJump;
+                }
+
+
+                if (this.surfaceCollided && this.player.bounceTime > 0) {
+                    console.log(this.surfaceCollided.facing);
+                    const multiplexer = 1 + Math.log(this.player.speedX ** 2 + this.player.speedY ** 2) / Math.log(BOUNCE_YSPEED ** 2 + PLAYER_SPEED_CAP_X ** 2) / 2;
+
+                    this.player.speedX = Math.cos(this.surfaceCollided.facing) * BOUNCE_XSPEED * multiplexer;
+                    this.player.speedY = BOUNCE_YSPEED;
+                    this.player.bounceTime -= 1;
+                }
+
+                else if (this.player.onGround || this.player.extraJump > 0) {
+                    this.player.speedY = JUMP_SPEED;
+                    if (!this.player.onGround) this.player.extraJump -= 1;
+                }
+
+                this.surfaceCollided = undefined;
             }
         }
     }
@@ -576,14 +628,12 @@ export class Game {
                 if (this.cameraY - this.canvas.height / 2 < this.map.bottomY) {
                     this.cameraY = this.map.bottomY + this.canvas.height / 2;
                 }
-    
+
             } else {
                 this.cameraY = this.canvas.height / 2;
             }
         }
-        // render player
-        this.context.fillStyle = "black";
-        this.context.fillRect(this.player.x - this.cameraX + this.canvas.width / 2 - PLAYER_WIDTH / 2, (this.canvas.height - this.player.y) + this.cameraY - this.canvas.height / 2, PLAYER_WIDTH, -PLAYER_HEIGHT);
+
         // render surfaces
         this.context.strokeStyle = "black";
         for (const surface of this.map.surfaces) {
@@ -592,6 +642,29 @@ export class Game {
             this.context.lineTo(surface.endX - this.cameraX + this.canvas.width / 2, this.canvas.height - (surface.endY - this.cameraY) - this.canvas.height / 2);
             this.context.stroke();
         }
+
+                // render player
+                const centerX = this.player.x - this.cameraX + this.canvas.width / 2;
+                const centerY = (this.canvas.height - this.player.y) + this.cameraY - this.canvas.height / 2;
+        
+                // border
+                this.context.fillStyle = "blue";
+                this.context.fillRect(centerX - PLAYER_WIDTH / 2 - PLAYER_BORDER_WIDTH, centerY + PLAYER_BORDER_WIDTH, PLAYER_WIDTH + 2 * PLAYER_BORDER_WIDTH, -PLAYER_HEIGHT - 2 * PLAYER_BORDER_WIDTH)
+        
+                // base
+                this.context.fillStyle = "black";
+                this.context.fillRect(centerX - PLAYER_WIDTH / 2, centerY, PLAYER_WIDTH, -PLAYER_HEIGHT);
+        
+                // can jump
+                this.context.fillStyle = this.player.onGround || this.player.extraJump > 0 ? "green" : "red";
+                this.context.fillRect(centerX - PLAYER_WIDTH / 2, centerY - PLAYER_HEIGHT, PLAYER_WIDTH / 2, PLAYER_HEIGHT / 2);
+        
+                // wall tireness
+                this.context.fillStyle = this.player.bounceTime > 0 ? "yellow" : "pink";
+                this.context.fillRect(centerX, centerY - PLAYER_HEIGHT, PLAYER_WIDTH / 2, PLAYER_HEIGHT / 2);
+        
+                // render player ends
+
         // debug
         if (this.DEBUG) {
             this.renderDebug();
@@ -624,10 +697,11 @@ export class Game {
         this.context.font = "20px Arial";
         this.context.textAlign = "center";
         this.context.textBaseline = "top";
-        this.context.fillText(`mouse: ${this.mouseX + this.cameraX - this.canvas.width / 2} ${this.canvas.height - this.mouseY + this.cameraY - this.canvas.height / 2}`, this.canvas.width / 2, 0);
-        this.context.fillText(`player: ${this.player.x} ${this.player.y}`, this.canvas.width / 2, 25);
-        this.context.fillText(`camera: ${this.cameraX} ${this.cameraY}`, this.canvas.width / 2, 50);
-        this.context.fillText(`level: ${this.currentMapIndex}`, this.canvas.width / 2, 75);
+        this.context.fillText(`mouse: ${(this.mouseX + this.cameraX - this.canvas.width / 2).toFixed(1)} ${(this.canvas.height - this.mouseY + this.cameraY - this.canvas.height / 2).toFixed(1)}`, this.canvas.width / 2, 0);
+        this.context.fillText(`player: ${this.player.x.toFixed(1)} ${this.player.y.toFixed(1)}`, this.canvas.width / 2, 25);
+        this.context.fillText(`camera: ${this.cameraX.toFixed(1)} ${this.cameraY.toFixed(1)}`, this.canvas.width / 2, 50);
+        this.context.fillText(`speed: ${this.player.speedX.toFixed(1)} ${this.player.speedY.toFixed(1)}`, this.canvas.width / 2, 75);
+        this.context.fillText(`level: ${this.currentMapIndex}`, this.canvas.width / 2, 100);
     }
 
     next() {

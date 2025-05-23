@@ -24,6 +24,15 @@ const PRESET_DIRECTIONS = [
     (7 * Math.PI) / 4
 ];
 
+function startPlaying() {
+    const mapData = window.btoa(JSON.stringify({
+        surfaces: surfaces,
+        features
+    }));
+
+    window.open(`/?map=${mapData}`, "_blank")
+}
+
 /**
  * 初始化画布和编辑器功能。
  */
@@ -43,6 +52,13 @@ function initializeEditor() {
     // 每秒刷新 50 次
     setInterval(update, 1000 / 50);
     draw();
+
+    document.getElementById("check_help").hidden = false;
+    const startBtn = document.getElementById("start_playing");
+    startBtn.hidden = false;
+    startBtn.addEventListener("click", (ev) => {
+        startPlaying();
+    });
 }
 
 /**
@@ -72,24 +88,55 @@ function drawSurface(surface) {
 }
 
 /**
+ * 
+ * @param { Surface } surface 
+ */
+function getSurfaceRightX(surface) {
+    const [startX, startY, length, facing] = surface;
+    return Math.max(startX, startX + length * Math.cos(facing - Math.PI / 2));
+}
+
+/**
  * 在画布上绘制所有边并显示选中的边的信息。
  */
 function draw() {
     ctx.clearRect(0, 0, canvas.width, canvas.height);
 
+    let mapWidth = 0;
+
     surfaces.forEach((surface, index) => {
         ctx.strokeStyle = index === selectedSurfaceIndex ? (surface[4] ? 'pink' : 'red') : (surface[4] ? 'gray' : 'black');
+        mapWidth = Math.max(getSurfaceRightX(surface), mapWidth);
         drawSurface(surface);
     });
-    ctx.strokeStyle = "#000000";
+    ctx.strokeStyle = "red";
     ctx.beginPath();
     ctx.moveTo(800, 600 - 0 + camera[1] - 300);
     ctx.lineTo(0, 600 - 0 + camera[1] - 300);
     ctx.stroke();
+
+    ctx.fillStyle = "red";
+    ctx.fillText("deadline (oh no", 400, 600 - 0 + camera[1] - 300 - 10);
+
+    ctx.strokeStyle = "black";
+
     ctx.beginPath();
     ctx.moveTo(0 - camera[0] + 400, 0);
     ctx.lineTo(0 - camera[0] + 400, 600);
     ctx.stroke();
+
+    ctx.fillStyle = "black";
+    ctx.fillText("left border", 0 - camera[0] + 400, 300);
+
+    ctx.strokeStyle = "green";
+    ctx.beginPath();
+    ctx.moveTo(mapWidth - camera[0] + 400, 0);
+    ctx.lineTo(mapWidth - camera[0] + 400, 600);
+    ctx.stroke();
+
+    ctx.fillStyle = "green";
+    ctx.fillText("winning border", mapWidth - camera[0] + 400, 300);
+
     ctx.fillStyle = 'black';
     ctx.fillText(
         `Camera: (${camera[0]}, ${camera[1]})`,
@@ -275,23 +322,23 @@ function download() {
     };
     // 创建一个Blob对象，类型为纯文本
     const blob = new Blob([JSON.stringify(exportData)], { type: "application/json" });
-  
+
     // 创建一个指向该Blob的URL
     const url = URL.createObjectURL(blob);
-  
+
     // 创建一个a标签用于下载
     const a = document.createElement('a');
     a.href = url;
     a.download = "map.json"; // 设置下载的文件名
     document.body.appendChild(a); // 将a标签添加到页面中
-  
+
     // 触发下载
     a.click();
-  
+
     // 清理：移除a标签，并释放Blob对象的URL
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
-  }
+}
 
 /**
  * 处理键盘按下事件。
@@ -310,7 +357,7 @@ function handleKeyDown(e) {
         selectedSurfaceIndex = (selectedSurfaceIndex - 1 + surfaces.length) % surfaces.length;
     } else if (e.key === 'y' && selectedSurfaceIndex !== -1) {
         surfaces[selectedSurfaceIndex][1] = 300;
-    } 
+    }
     else if (e.key === 'c') {
         copyToClipboard();
     } else if (e.key === 'p') {

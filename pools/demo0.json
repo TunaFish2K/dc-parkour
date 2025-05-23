@@ -1,11 +1,6 @@
 {
     "values": [
         "/levels/tutorial.json",
-        "/levels/demo0/0.json",
-        "/levels/demo0/1.json",
-        "/levels/demo0/3.json",
-        "/levels/demo0/4.json",
-        "/levels/demo0/5.json",
-        "/levels/fun.json"
+        "/levels/demo1/climb0.json"
     ]
 }
