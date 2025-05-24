@@ -393,7 +393,10 @@ function startEditor() {
     const mapDataInput = document.getElementById('mapDataInput');
     try {
         const mapData = JSON.parse((() => {
-            if (mapDataInput.value === "") return "{\"surfaces\":[], \"features\":[]}";
+            if (mapDataInput.value === "") return JSON.stringify({
+                surfaces: [[0, 300, 100, Math.PI / 2]],
+                features: []
+            });
             return mapDataInput.value;
         })());
         for (let index = 0; index < mapData.surfaces.length; index++) {
