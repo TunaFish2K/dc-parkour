@@ -391,12 +391,14 @@ function handleKeyUp(e) {
  */
 function startEditor() {
     const mapDataInput = document.getElementById('mapDataInput');
+    const data = (/**@type {string} */mapDataInput.value).trim();
     try {
         const mapData = JSON.parse((() => {
             if (mapDataInput.value === "") return JSON.stringify({
                 surfaces: [[0, 300, 100, Math.PI / 2]],
                 features: []
             });
+            console.log("bruh initial surfaces");
             return mapDataInput.value;
         })());
         for (let index = 0; index < mapData.surfaces.length; index++) {
